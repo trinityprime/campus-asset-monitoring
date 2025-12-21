@@ -1,9 +1,21 @@
+<!DOCTYPE html>
 <html>
-<head>
-    <title>My First AWS Website</title>
-</head>
-<body>
-    <h1>Hello, World!</h1>
-    <p>Welcome to my website hosted on AWS EC2!</p>
-</body>
+  <head>
+    <title>campus asset monitoring</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <h1>campus asset monitoring system</h1>
+
+    <form id="issueForm">
+      <input type="text" id="location" placeholder="location" required />
+      <textarea id="description" placeholder="description"></textarea>
+      <button type="submit">submit issue</button>
+    </form>
+
+    <h2>issues</h2>
+    <div id="issues"></div>
+
+    <script src="js/app.js"></script>
+  </body>
 </html>
