@@ -1,8 +1,28 @@
 body {
-  background-color: #f8f9fa;
+  background-color: #f0f2f5;
 }
 
 h1,
 h2 {
-  text-align: center;
+  color: #343a40;
+}
+
+.card img {
+  height: 250px;
+  object-fit: cover;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.card-body {
+  padding: 1rem;
+}
+
+#categoryFilter {
+  margin-top: 10px;
+}
+
+@media (max-width: 767px) {
+  #categoryFilter {
+    margin-bottom: 15px;
+  }
 }
