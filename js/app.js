@@ -1,67 +1,54 @@
-const form = document.getElementById("issueForm");
-const issuesDiv = document.getElementById("issues");
+const backendUrl = "http://34.227.53.47:3000";
 
-form.addEventListener("submit", async (e) => {
+// handle form submit
+document.getElementById("reportForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-
-  const location = document.getElementById("location").value.trim();
-  const description = document.getElementById("description").value.trim();
-  const imageFile = document.getElementById("image").files[0];
-
-  if (!location) return;
-
-  const formData = new FormData();
-  formData.append("location", location);
-  formData.append("description", description);
-  if (imageFile) formData.append("image", imageFile);
+  const formData = new FormData(e.target);
 
   try {
-    const res = await fetch("/api/issues", {
+    const res = await fetch(`${backendUrl}/report`, {
       method: "POST",
       body: formData,
     });
 
-    const saved = await res.json();
-    renderIssue(saved);
-  } catch {
-    renderIssue({
-      location,
-      description,
-      imageUrl: imageFile ? URL.createObjectURL(imageFile) : null,
-    });
+    if (res.ok) {
+      alert("Issue reported!");
+      e.target.reset();
+      loadIssues();
+    } else {
+      alert("Error submitting issue");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Network error");
   }
-
-  form.reset();
 });
 
-function renderIssue(issue) {
-  const col = document.createElement("div");
-  col.className = "col-md-4";
-
-  col.innerHTML = `
-    <div class="card h-100">
-      ${
-        issue.imageUrl
-          ? `<img src="${issue.imageUrl}" class="card-img-top">`
-          : ""
-      }
-      <div class="card-body">
-        <h6 class="card-title">${issue.location}</h6>
-        <p class="card-text">${issue.description || ""}</p>
-      </div>
-    </div>
-  `;
-  issuesDiv.prepend(col);
-}
-
+// fetch & render issues
 async function loadIssues() {
   try {
-    const res = await fetch("/api/issues");
-    const data = await res.json();
-    issuesDiv.innerHTML = "";
-    data.forEach(renderIssue);
-  } catch {
-    console.log("backend asleep but frontend still shining");
+    const res = await fetch(`${backendUrl}/api/issues`);
+    const issues = await res.json();
+    const container = document.getElementById("issues");
+    container.innerHTML = ""; 
+
+    issues.forEach((issue) => {
+      const card = document.createElement("div");
+      card.className = "col-md-4 mb-3";
+      card.innerHTML = `
+        <div class="card">
+          <img src="${issue.imageUrl}" class="card-img-top" style="height:200px; object-fit:cover;">
+          <div class="card-body">
+            <h5 class="card-title">${issue.category}</h5>
+            <p class="card-text">${issue.description}</p>
+            <small class="text-muted">${issue.location} | ${issue.status}</small>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  } catch (err) {
+    console.error(err);
   }
 }
 

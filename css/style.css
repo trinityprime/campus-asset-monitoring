@@ -1,8 +1,8 @@
 body {
-  font-family: system-ui, -apple-system, sans-serif;
+  background-color: #f8f9fa;
 }
 
-.card img {
-  object-fit: cover;
-  height: 180px;
+h1,
+h2 {
+  text-align: center;
 }
