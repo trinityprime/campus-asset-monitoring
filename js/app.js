@@ -4,7 +4,7 @@ const poolData = {
   ClientId: "2ln0cuq94e7ckjo0ira0qqod5u",
 };
 const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
-const backendUrl = "http://34.227.53.47:3000";
+const backendUrl = "http://campus-issues.duckdns.org:3000";
 
 // --- REGISTER ---
 function register() {
