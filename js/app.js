@@ -8,9 +8,9 @@ const backendUrl = "http://campus-issues.duckdns.org:3000";
 
 // --- REGISTER ---
 function register() {
-  const username = document.getElementById("username").value;
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
+  const username = document.getElementById("regUsername").value;
+  const email = document.getElementById("regEmail").value;
+  const password = document.getElementById("regPassword").value;
 
   const attributeList = [
     new AmazonCognitoIdentity.CognitoUserAttribute({
@@ -21,7 +21,33 @@ function register() {
 
   userPool.signUp(username, password, attributeList, null, (err, result) => {
     if (err) return alert(err.message);
-    alert("Registered! Check your email for the verification link/code.");
+
+    // Success: Hide register, show verify
+    document.getElementById("registerSection").classList.add("hidden");
+    document.getElementById("verifySection").classList.remove("hidden");
+    alert("Registration successful! Please enter the code sent to " + email);
+  });
+}
+
+// --- VERIFY CODE ---
+function confirmRegistration() {
+  const username = document.getElementById("regUsername").value; 
+  const code = document.getElementById("verifyCode").value;
+
+  const userData = {
+    Username: username,
+    Pool: userPool,
+  };
+
+  const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+
+  cognitoUser.confirmRegistration(code, true, (err, result) => {
+    if (err) return alert(err.message);
+
+    alert("Account verified! You can now login.");
+    // Switch back to login view
+    document.getElementById("verifySection").classList.add("hidden");
+    document.getElementById("loginSection").classList.remove("hidden");
   });
 }
 
@@ -42,30 +68,40 @@ function login() {
 
   cognitoUser.authenticateUser(authDetails, {
     onSuccess: (result) => {
-      console.log("Logged in!");
-      checkAuth();
+      console.log("Logged in successfully");
+      checkAuth(); // Refresh UI
     },
     onFailure: (err) => alert(err.message),
   });
 }
 
-// --- CHECK AUTH & GET TOKEN ---
+// --- UI & SESSION MANAGEMENT ---
 function checkAuth() {
   const cognitoUser = userPool.getCurrentUser();
+  const authCard = document.getElementById("authCard");
   const reportCard = document.getElementById("reportCard");
   const logoutBtn = document.getElementById("logoutBtn");
 
   if (cognitoUser) {
     cognitoUser.getSession((err, session) => {
-      if (session && session.isValid()) {
-        reportCard.style.display = "block";
-        logoutBtn.classList.remove("d-none");
+      if (err || !session.isValid()) {
+        showLoggedOutState();
+      } else {
+        // User is logged in
+        authCard.classList.add("hidden");
+        reportCard.classList.remove("hidden");
+        logoutBtn.classList.remove("hidden");
       }
     });
   } else {
-    reportCard.style.display = "none";
-    logoutBtn.classList.add("d-none");
+    showLoggedOutState();
   }
+}
+
+function showLoggedOutState() {
+  document.getElementById("authCard").classList.remove("hidden");
+  document.getElementById("reportCard").classList.add("hidden");
+  document.getElementById("logoutBtn").classList.add("hidden");
 }
 
 // --- SUBMIT REPORT ---
@@ -76,7 +112,9 @@ document.getElementById("reportForm").addEventListener("submit", async (e) => {
   if (!cognitoUser) return alert("Please login first");
 
   cognitoUser.getSession(async (err, session) => {
-    const token = session.getIdToken().getJwtToken(); // GET TOKEN
+    if (err) return alert("Session expired. Please login again.");
+
+    const token = session.getIdToken().getJwtToken();
     const formData = new FormData(e.target);
 
     try {
@@ -85,21 +123,57 @@ document.getElementById("reportForm").addEventListener("submit", async (e) => {
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
+
       if (res.ok) {
-        alert("Reported!");
+        alert("Reported successfully!");
+        e.target.reset();
         loadIssues();
+      } else {
+        alert("Server error. Please try again.");
       }
     } catch (err) {
-      alert("Error connecting to server");
+      alert("Error connecting to backend.");
     }
   });
 });
 
+// --- LOAD ISSUES ---
+async function loadIssues() {
+  try {
+    const res = await fetch(`${backendUrl}/api/issues`);
+    const issues = await res.json();
+    const container = document.getElementById("issues");
+
+    container.innerHTML = issues
+      .map(
+        (issue) => `
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 card-shadow">
+                    <img src="${issue.imageUrl}" class="card-img-top">
+                    <div class="card-body">
+                        <span class="badge bg-info text-dark mb-2 text-capitalize">${issue.category}</span>
+                        <p class="card-text">${issue.description}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">📍 ${issue.location}</small>
+                            <span class="badge bg-light text-dark border">${issue.status}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `
+      )
+      .join("");
+  } catch (err) {
+    console.error("Load failed", err);
+  }
+}
+
 function logout() {
   const cognitoUser = userPool.getCurrentUser();
   if (cognitoUser) cognitoUser.signOut();
-  checkAuth();
+  window.location.reload();
 }
 
-// Initialize
+// Init
 checkAuth();
+loadIssues();

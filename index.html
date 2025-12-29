@@ -10,17 +10,27 @@
       rel="stylesheet"
     />
   </head>
-  <body class="bg-light">
-    <div class="container mt-4">
-      <h1 class="mb-4 text-center">Campus Asset Monitoring</h1>
+  <body>
+    <nav class="navbar navbar-dark bg-primary mb-4">
+      <div class="container">
+        <span class="navbar-brand mb-0 h1">Campus Asset Monitor</span>
+        <button
+          id="logoutBtn"
+          class="btn btn-outline-light btn-sm hidden"
+          onclick="logout()"
+        >
+          Logout
+        </button>
+      </div>
+    </nav>
 
+    <div class="container">
       <div class="row">
-        <!-- Sidebar filter -->
         <div class="col-md-3 mb-4">
-          <div class="card p-3">
+          <div class="card p-3 card-shadow">
             <h5>Filter by Category</h5>
             <select id="categoryFilter" class="form-select">
-              <option value="">All</option>
+              <option value="">All Issues</option>
               <option value="furniture">Furniture</option>
               <option value="electrical">Electrical</option>
               <option value="cleanliness">Cleanliness</option>
@@ -29,92 +39,139 @@
           </div>
         </div>
 
-        <!-- Main content -->
         <div class="col-md-9">
-          <!-- Auth Section -->
-          <div id="authCard" class="card p-4 mb-4">
-            <h3 class="text-center mb-3">login to report issues</h3>
+          <div id="authCard" class="card p-4 mb-4 card-shadow">
+            <div id="loginSection">
+              <h3 class="text-center mb-3">Login</h3>
+              <input
+                id="username"
+                class="form-control mb-2"
+                placeholder="Username"
+              />
+              <input
+                id="password"
+                type="password"
+                class="form-control mb-3"
+                placeholder="Password"
+              />
+              <button class="btn btn-primary w-100 mb-2" onclick="login()">
+                Sign In
+              </button>
+              <p class="text-center small mt-2">
+                Need an account?
+                <a href="javascript:void(0)" onclick="toggleAuth(true)"
+                  >Register</a
+                >
+              </p>
+            </div>
 
-            <input
-              id="username"
-              class="form-control mb-2"
-              placeholder="username"
-            />
-            <input
-              id="email"
-              type="email"
-              class="form-control mb-2"
-              placeholder="email (register only)"
-            />
-            <input
-              id="password"
-              type="password"
-              class="form-control mb-3"
-              placeholder="password"
-            />
+            <div id="registerSection" class="hidden">
+              <h3 class="text-center mb-3">Create Account</h3>
+              <input
+                id="regUsername"
+                class="form-control mb-2"
+                placeholder="Choose Username"
+              />
+              <input
+                id="regEmail"
+                type="email"
+                class="form-control mb-2"
+                placeholder="Campus Email"
+              />
+              <input
+                id="regPassword"
+                type="password"
+                class="form-control mb-3"
+                placeholder="Password"
+              />
+              <button class="btn btn-warning w-100 mb-2" onclick="register()">
+                Register
+              </button>
+              <p class="text-center small mt-2">
+                Already have an account?
+                <a href="javascript:void(0)" onclick="toggleAuth(false)"
+                  >Back to Login</a
+                >
+              </p>
+            </div>
 
-            <button class="btn btn-warning w-100 mb-2" onclick="register()">
-              register
-            </button>
-            <button class="btn btn-primary w-100 mb-2" onclick="login()">
-              login
-            </button>
-            <button
-              class="btn btn-secondary w-100 d-none"
-              id="logoutBtn"
-              onclick="logout()"
-            >
-              logout
-            </button>
+            <div id="verifySection" class="hidden">
+              <h3 class="text-center mb-3">Verify Email</h3>
+              <p class="text-center text-muted small">
+                Enter the code sent to your email
+              </p>
+              <input
+                id="verifyCode"
+                class="form-control mb-3 text-center"
+                placeholder="6-digit code"
+                maxlength="6"
+              />
+              <button
+                class="btn btn-success w-100"
+                onclick="confirmRegistration()"
+              >
+                Confirm & Verify
+              </button>
+            </div>
           </div>
 
-          <!-- Report form -->
-          <div id="reportCard" class="card p-4 mb-4 shadow-sm">
-            <h2 class="mb-3 text-center">Report Campus Issue</h2>
-            <form id="reportForm" enctype="multipart/form-data">
-              <div class="mb-3">
-                <label class="form-label">Image</label>
-                <input type="file" name="image" class="form-control" required />
+          <div id="reportCard" class="card p-4 mb-4 card-shadow hidden">
+            <h2 class="mb-3 text-center text-primary">Report an Issue</h2>
+            <form id="reportForm">
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label font-weight-bold"
+                    >Upload Evidence</label
+                  >
+                  <input
+                    type="file"
+                    name="image"
+                    class="form-control"
+                    required
+                  />
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label font-weight-bold">Category</label>
+                  <select name="category" class="form-select" required>
+                    <option value="furniture">Furniture</option>
+                    <option value="electrical">Electrical</option>
+                    <option value="cleanliness">Cleanliness</option>
+                    <option value="safety">Safety</option>
+                  </select>
+                </div>
               </div>
 
               <div class="mb-3">
-                <label class="form-label">Category</label>
-                <select name="category" class="form-select" required>
-                  <option>furniture</option>
-                  <option>electrical</option>
-                  <option>cleanliness</option>
-                  <option>safety</option>
-                </select>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">Location</label>
+                <label class="form-label font-weight-bold">Location</label>
                 <input
                   type="text"
                   name="location"
                   class="form-control"
-                  placeholder="e.g. Lab 3A"
+                  placeholder="e.g. Block T12 Lab 4"
                   required
                 />
               </div>
 
               <div class="mb-3">
-                <label class="form-label">Description</label>
+                <label class="form-label font-weight-bold"
+                  >Issue Description</label
+                >
                 <textarea
                   name="description"
                   class="form-control"
-                  placeholder="Describe the issue"
+                  rows="3"
+                  placeholder="Briefly describe what's wrong..."
+                  required
                 ></textarea>
               </div>
 
-              <button type="submit" class="btn btn-primary w-100">
-                Submit Issue
+              <button type="submit" class="btn btn-primary w-100 py-2">
+                Submit Report
               </button>
             </form>
           </div>
 
-          <!-- Reported issues -->
-          <h2 class="mb-3 text-center">Reported Issues</h2>
+          <h2 class="mb-3">Recent Reports</h2>
           <div id="issues" class="row g-4"></div>
         </div>
       </div>
@@ -123,5 +180,18 @@
     <script src="js/amazon-cognito-identity.min.js"></script>
     <script src="js/app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+      // Simple UI toggle for the auth card
+      function toggleAuth(showRegister) {
+        document
+          .getElementById("loginSection")
+          .classList.toggle("hidden", showRegister);
+        document
+          .getElementById("registerSection")
+          .classList.toggle("hidden", !showRegister);
+        document.getElementById("verifySection").classList.add("hidden");
+      }
+    </script>
   </body>
 </html>
