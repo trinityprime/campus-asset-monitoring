@@ -8,18 +8,16 @@ Amplify.configure({
   },
 });
 
+const backendUrl = "http://34.227.53.47:3000";
+
+// --- AUTH FUNCTIONS ---
 async function register() {
   const username = document.getElementById("username").value;
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
-
   try {
-    await Auth.signUp({
-      username,
-      password,
-      attributes: { email },
-    });
-    alert("registered. check email then login.");
+    await Auth.signUp({ username, password, attributes: { email } });
+    alert("Registration successful! Check email for code.");
   } catch (err) {
     alert(err.message);
   }
@@ -28,10 +26,8 @@ async function register() {
 async function login() {
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
-
   try {
     await Auth.signIn(username, password);
-    alert("logged in");
     checkAuth();
   } catch (err) {
     alert(err.message);
@@ -46,7 +42,6 @@ async function logout() {
 async function checkAuth() {
   const reportCard = document.getElementById("reportCard");
   const logoutBtn = document.getElementById("logoutBtn");
-
   try {
     await Auth.currentAuthenticatedUser();
     reportCard.style.display = "block";
@@ -57,67 +52,58 @@ async function checkAuth() {
   }
 }
 
-const backendUrl = "http://34.227.53.47:3000";
-
+// --- API FUNCTIONS ---
 const reportForm = document.getElementById("reportForm");
-const categoryFilter = document.getElementById("categoryFilter");
 
 reportForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const formData = new FormData(e.target);
 
   try {
+    // 1. Get the JWT Token from Cognito
+    const session = await Auth.currentSession();
+    const token = session.getIdToken().getJwtToken();
+
+    // 2. Build Request
+    const formData = new FormData(e.target);
     const res = await fetch(`${backendUrl}/report`, {
       method: "POST",
+      headers: { Authorization: `Bearer ${token}` }, // SECURE
       body: formData,
     });
+
     if (res.ok) {
       alert("Issue reported!");
       e.target.reset();
       loadIssues();
-    } else alert("Error submitting issue");
+    } else {
+      alert("Unauthorized or Server Error");
+    }
   } catch (err) {
-    console.error(err);
-    alert("Network error");
+    alert("Please log in to submit a report.");
   }
 });
 
 async function loadIssues() {
-  try {
-    const res = await fetch(`${backendUrl}/api/issues`);
-    const issues = await res.json();
-
-    const selectedCategory = categoryFilter.value;
-    const filteredIssues = selectedCategory
-      ? issues.filter((issue) => issue.category === selectedCategory)
-      : issues;
-
-    const container = document.getElementById("issues");
-    container.innerHTML = "";
-
-    filteredIssues.forEach((issue) => {
-      const card = document.createElement("div");
-      card.className = "col-md-6 col-lg-4";
-      card.innerHTML = `
-        <div class="card shadow-sm">
-          <img src="${issue.imageUrl}" class="card-img-top">
-          <div class="card-body">
-            <h5 class="card-title text-capitalize">${issue.category}</h5>
-            <p class="card-text">${issue.description}</p>
-            <small class="text-muted">${issue.location} | ${issue.status}</small>
-          </div>
+  const res = await fetch(`${backendUrl}/api/issues`);
+  const issues = await res.json();
+  const container = document.getElementById("issues");
+  container.innerHTML = issues
+    .map(
+      (issue) => `
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <img src="${issue.imageUrl}" class="card-img-top">
+                <div class="card-body">
+                    <h6>${issue.category}</h6>
+                    <p>${issue.description}</p>
+                </div>
+            </div>
         </div>
-      `;
-      container.appendChild(card);
-    });
-  } catch (err) {
-    console.error(err);
-  }
+    `
+    )
+    .join("");
 }
 
-// load issues on page load
-loadIssues();
+// Init
 checkAuth();
-
-// reload when filter changes
-categoryFilter.addEventListener("change", loadIssues);
+loadIssues();
