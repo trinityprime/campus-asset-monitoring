@@ -31,7 +31,7 @@ function register() {
 
 // --- VERIFY CODE ---
 function confirmRegistration() {
-  const username = document.getElementById("regUsername").value; 
+  const username = document.getElementById("regUsername").value;
   const code = document.getElementById("verifyCode").value;
 
   const userData = {
@@ -141,8 +141,23 @@ document.getElementById("reportForm").addEventListener("submit", async (e) => {
 async function loadIssues() {
   try {
     const res = await fetch(`${backendUrl}/api/issues`);
-    const issues = await res.json();
+    let issues = await res.json();
+
+    const filterValue = document.getElementById("categoryFilter").value;
+
+    if (filterValue) {
+      issues = issues.filter(
+        (issue) => issue.category.toLowerCase() === filterValue.toLowerCase()
+      );
+    }
+
     const container = document.getElementById("issues");
+
+    if (issues.length === 0) {
+      container.innerHTML =
+        "<div class='col-12 text-center'><p class='text-muted'>No issues found for this category.</p></div>";
+      return;
+    }
 
     container.innerHTML = issues
       .map(
@@ -151,11 +166,17 @@ async function loadIssues() {
                 <div class="card h-100 card-shadow">
                     <img src="${issue.imageUrl}" class="card-img-top">
                     <div class="card-body">
-                        <span class="badge bg-info text-dark mb-2 text-capitalize">${issue.category}</span>
+                        <span class="badge bg-info text-dark mb-2 text-capitalize">${
+                          issue.category
+                        }</span>
                         <p class="card-text">${issue.description}</p>
                         <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">📍 ${issue.location}</small>
-                            <span class="badge bg-light text-dark border">${issue.status}</span>
+                            <small class="text-muted">📍 ${
+                              issue.location
+                            }</small>
+                            <span class="badge bg-light text-dark border">${
+                              issue.status || "Pending"
+                            }</span>
                         </div>
                     </div>
                 </div>
@@ -167,6 +188,11 @@ async function loadIssues() {
     console.error("Load failed", err);
   }
 }
+
+// 3. Add an Event Listener so it updates instantly when you click the dropdown
+document
+  .getElementById("categoryFilter")
+  .addEventListener("change", loadIssues);
 
 function logout() {
   const cognitoUser = userPool.getCurrentUser();
