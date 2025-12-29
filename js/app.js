@@ -1,3 +1,5 @@
+const { Amplify, Auth } = window;
+
 Amplify.configure({
   Auth: {
     region: "us-east-1",
@@ -12,12 +14,12 @@ async function register() {
   const password = document.getElementById("password").value;
 
   try {
-    await Amplify.Auth.signUp({
+    await Auth.signUp({
       username,
       password,
       attributes: { email },
     });
-    alert("registered. check your email, then login.");
+    alert("registered. check email then login.");
   } catch (err) {
     alert(err.message);
   }
@@ -28,7 +30,7 @@ async function login() {
   const password = document.getElementById("password").value;
 
   try {
-    await Amplify.Auth.signIn(username, password);
+    await Auth.signIn(username, password);
     alert("logged in");
     checkAuth();
   } catch (err) {
@@ -37,17 +39,16 @@ async function login() {
 }
 
 async function logout() {
-  await Amplify.Auth.signOut();
+  await Auth.signOut();
   checkAuth();
 }
 
 async function checkAuth() {
   const reportCard = document.getElementById("reportCard");
-  const authCard = document.getElementById("authCard");
   const logoutBtn = document.getElementById("logoutBtn");
 
   try {
-    await Amplify.Auth.currentAuthenticatedUser();
+    await Auth.currentAuthenticatedUser();
     reportCard.style.display = "block";
     logoutBtn.classList.remove("d-none");
   } catch {
