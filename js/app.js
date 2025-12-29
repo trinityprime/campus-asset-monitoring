@@ -1,109 +1,105 @@
-const { Amplify, Auth } = window;
-
-Amplify.configure({
-  Auth: {
-    region: "us-east-1",
-    userPoolId: "us-east-1_9jBRbvy4K",
-    userPoolWebClientId: "4mq5eoi1jdrmm1k71ag4fo3gij",
-  },
-});
-
+// Configuration
+const poolData = {
+  UserPoolId: "us-east-1_9jBRbvy4K",
+  ClientId: "4mq5eoi1jdrmm1k71ag4fo3gij",
+};
+const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 const backendUrl = "http://34.227.53.47:3000";
 
-// --- AUTH FUNCTIONS ---
-async function register() {
+// --- REGISTER ---
+function register() {
   const username = document.getElementById("username").value;
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
-  try {
-    await Auth.signUp({ username, password, attributes: { email } });
-    alert("Registration successful! Check email for code.");
-  } catch (err) {
-    alert(err.message);
-  }
+
+  const attributeList = [
+    new AmazonCognitoIdentity.CognitoUserAttribute({
+      Name: "email",
+      Value: email,
+    }),
+  ];
+
+  userPool.signUp(username, password, attributeList, null, (err, result) => {
+    if (err) return alert(err.message);
+    alert("Registered! Check your email for the verification link/code.");
+  });
 }
 
-async function login() {
+// --- LOGIN ---
+function login() {
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
-  try {
-    await Auth.signIn(username, password);
-    checkAuth();
-  } catch (err) {
-    alert(err.message);
-  }
+
+  const authDetails = new AmazonCognitoIdentity.AuthenticationDetails({
+    Username: username,
+    Password: password,
+  });
+
+  const cognitoUser = new AmazonCognitoIdentity.CognitoUser({
+    Username: username,
+    Pool: userPool,
+  });
+
+  cognitoUser.authenticateUser(authDetails, {
+    onSuccess: (result) => {
+      console.log("Logged in!");
+      checkAuth();
+    },
+    onFailure: (err) => alert(err.message),
+  });
 }
 
-async function logout() {
-  await Auth.signOut();
-  checkAuth();
-}
-
-async function checkAuth() {
+// --- CHECK AUTH & GET TOKEN ---
+function checkAuth() {
+  const cognitoUser = userPool.getCurrentUser();
   const reportCard = document.getElementById("reportCard");
   const logoutBtn = document.getElementById("logoutBtn");
-  try {
-    await Auth.currentAuthenticatedUser();
-    reportCard.style.display = "block";
-    logoutBtn.classList.remove("d-none");
-  } catch {
+
+  if (cognitoUser) {
+    cognitoUser.getSession((err, session) => {
+      if (session && session.isValid()) {
+        reportCard.style.display = "block";
+        logoutBtn.classList.remove("d-none");
+      }
+    });
+  } else {
     reportCard.style.display = "none";
     logoutBtn.classList.add("d-none");
   }
 }
 
-// --- API FUNCTIONS ---
-const reportForm = document.getElementById("reportForm");
-
-reportForm.addEventListener("submit", async (e) => {
+// --- SUBMIT REPORT ---
+document.getElementById("reportForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const cognitoUser = userPool.getCurrentUser();
 
-  try {
-    // 1. Get the JWT Token from Cognito
-    const session = await Auth.currentSession();
-    const token = session.getIdToken().getJwtToken();
+  if (!cognitoUser) return alert("Please login first");
 
-    // 2. Build Request
+  cognitoUser.getSession(async (err, session) => {
+    const token = session.getIdToken().getJwtToken(); // GET TOKEN
     const formData = new FormData(e.target);
-    const res = await fetch(`${backendUrl}/report`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` }, // SECURE
-      body: formData,
-    });
 
-    if (res.ok) {
-      alert("Issue reported!");
-      e.target.reset();
-      loadIssues();
-    } else {
-      alert("Unauthorized or Server Error");
+    try {
+      const res = await fetch(`${backendUrl}/report`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (res.ok) {
+        alert("Reported!");
+        loadIssues();
+      }
+    } catch (err) {
+      alert("Error connecting to server");
     }
-  } catch (err) {
-    alert("Please log in to submit a report.");
-  }
+  });
 });
 
-async function loadIssues() {
-  const res = await fetch(`${backendUrl}/api/issues`);
-  const issues = await res.json();
-  const container = document.getElementById("issues");
-  container.innerHTML = issues
-    .map(
-      (issue) => `
-        <div class="col-md-4">
-            <div class="card mb-3">
-                <img src="${issue.imageUrl}" class="card-img-top">
-                <div class="card-body">
-                    <h6>${issue.category}</h6>
-                    <p>${issue.description}</p>
-                </div>
-            </div>
-        </div>
-    `
-    )
-    .join("");
+function logout() {
+  const cognitoUser = userPool.getCurrentUser();
+  if (cognitoUser) cognitoUser.signOut();
+  checkAuth();
 }
 
-// Init
+// Initialize
 checkAuth();
-loadIssues();
