@@ -1,3 +1,61 @@
+Amplify.configure({
+  Auth: {
+    region: "us-east-1",
+    userPoolId: "us-east-1_9jBRbvy4K",
+    userPoolWebClientId: "4mq5eoi1jdrmm1k71ag4fo3gij",
+  },
+});
+
+async function register() {
+  const username = document.getElementById("username").value;
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  try {
+    await Amplify.Auth.signUp({
+      username,
+      password,
+      attributes: { email },
+    });
+    alert("registered. check your email, then login.");
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function login() {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+
+  try {
+    await Amplify.Auth.signIn(username, password);
+    alert("logged in");
+    checkAuth();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function logout() {
+  await Amplify.Auth.signOut();
+  checkAuth();
+}
+
+async function checkAuth() {
+  const reportCard = document.getElementById("reportCard");
+  const authCard = document.getElementById("authCard");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  try {
+    await Amplify.Auth.currentAuthenticatedUser();
+    reportCard.style.display = "block";
+    logoutBtn.classList.remove("d-none");
+  } catch {
+    reportCard.style.display = "none";
+    logoutBtn.classList.add("d-none");
+  }
+}
+
 const backendUrl = "http://34.227.53.47:3000";
 
 const reportForm = document.getElementById("reportForm");
@@ -58,6 +116,7 @@ async function loadIssues() {
 
 // load issues on page load
 loadIssues();
+checkAuth();
 
 // reload when filter changes
 categoryFilter.addEventListener("change", loadIssues);
