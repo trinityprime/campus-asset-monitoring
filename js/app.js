@@ -1,7 +1,7 @@
 // Configuration
 const poolData = {
   UserPoolId: "us-east-1_9jBRbvy4K",
-  ClientId: "4mq5eoi1jdrmm1k71ag4fo3gij",
+  ClientId: "2ln0cuq94e7ckjo0ira0qqod5u",
 };
 const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 const backendUrl = "http://34.227.53.47:3000";
