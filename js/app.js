@@ -1,4 +1,4 @@
-// Configuration
+// --- CONFIGURATION ---
 const poolData = {
   UserPoolId: "us-east-1_9jBRbvy4K",
   ClientId: "2ln0cuq94e7ckjo0ira0qqod5u",
@@ -6,7 +6,38 @@ const poolData = {
 const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 const backendUrl = "http://campus-issues.duckdns.org:3000";
 
-// --- REGISTER ---
+// Global variable for the Bootstrap Modal
+let authModal;
+
+// Initialize Modal when page loads
+document.addEventListener("DOMContentLoaded", () => {
+  authModal = new bootstrap.Modal(document.getElementById("authModal"));
+});
+
+// --- AUTH UI LOGIC ---
+
+// The "Smart" Button logic
+function handleReportClick() {
+  const cognitoUser = userPool.getCurrentUser();
+
+  if (cognitoUser) {
+    // If logged in, ensure we have a valid session, then show form
+    cognitoUser.getSession((err, session) => {
+      if (err || !session.isValid()) {
+        authModal.show();
+      } else {
+        const reportCard = document.getElementById("reportCard");
+        reportCard.classList.remove("hidden");
+        reportCard.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  } else {
+    // Not logged in? Show the popup
+    authModal.show();
+  }
+}
+
+// --- REGISTER & VERIFY ---
 function register() {
   const username = document.getElementById("regUsername").value;
   const email = document.getElementById("regEmail").value;
@@ -22,32 +53,25 @@ function register() {
   userPool.signUp(username, password, attributeList, null, (err, result) => {
     if (err) return alert(err.message);
 
-    // Success: Hide register, show verify
     document.getElementById("registerSection").classList.add("hidden");
     document.getElementById("verifySection").classList.remove("hidden");
-    alert("Registration successful! Please enter the code sent to " + email);
+    alert("Code sent to " + email);
   });
 }
 
-// --- VERIFY CODE ---
 function confirmRegistration() {
   const username = document.getElementById("regUsername").value;
   const code = document.getElementById("verifyCode").value;
 
-  const userData = {
+  const cognitoUser = new AmazonCognitoIdentity.CognitoUser({
     Username: username,
     Pool: userPool,
-  };
-
-  const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+  });
 
   cognitoUser.confirmRegistration(code, true, (err, result) => {
     if (err) return alert(err.message);
-
-    alert("Account verified! You can now login.");
-    // Switch back to login view
-    document.getElementById("verifySection").classList.add("hidden");
-    document.getElementById("loginSection").classList.remove("hidden");
+    alert("Verified! You can now sign in.");
+    toggleAuth(false); // Switch back to login view inside modal
   });
 }
 
@@ -68,51 +92,94 @@ function login() {
 
   cognitoUser.authenticateUser(authDetails, {
     onSuccess: (result) => {
-      console.log("Logged in successfully");
-      checkAuth(); // Refresh UI
+      authModal.hide(); // Close the popup
+      checkAuth(); // Refresh UI to show logout btn
+      // Automatically open the report form after successful login
+      document.getElementById("reportCard").classList.remove("hidden");
     },
     onFailure: (err) => alert(err.message),
   });
 }
 
-// --- UI & SESSION MANAGEMENT ---
+// --- SESSION CHECK ---
 function checkAuth() {
   const cognitoUser = userPool.getCurrentUser();
-  const authCard = document.getElementById("authCard");
-  const reportCard = document.getElementById("reportCard");
   const logoutBtn = document.getElementById("logoutBtn");
 
   if (cognitoUser) {
     cognitoUser.getSession((err, session) => {
-      if (err || !session.isValid()) {
-        showLoggedOutState();
-      } else {
-        // User is logged in
-        authCard.classList.add("hidden");
-        reportCard.classList.remove("hidden");
+      if (session && session.isValid()) {
         logoutBtn.classList.remove("hidden");
+      } else {
+        logoutBtn.classList.add("hidden");
       }
     });
   } else {
-    showLoggedOutState();
+    logoutBtn.classList.add("hidden");
   }
 }
 
-function showLoggedOutState() {
-  document.getElementById("authCard").classList.remove("hidden");
-  document.getElementById("reportCard").classList.add("hidden");
-  document.getElementById("logoutBtn").classList.add("hidden");
+// --- ISSUES LOGIC (With Filter) ---
+async function loadIssues() {
+  try {
+    const res = await fetch(`${backendUrl}/api/issues`);
+    let issues = await res.json();
+
+    const filterValue = document.getElementById("categoryFilter").value;
+    if (filterValue) {
+      issues = issues.filter(
+        (i) => i.category.toLowerCase() === filterValue.toLowerCase()
+      );
+    }
+
+    const container = document.getElementById("issues");
+    if (issues.length === 0) {
+      container.innerHTML =
+        "<p class='text-center mt-5 text-muted'>No issues reported in this category.</p>";
+      return;
+    }
+
+    container.innerHTML = issues
+      .map(
+        (issue) => `
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 card-shadow border-0">
+                    <img src="${
+                      issue.imageUrl
+                    }" class="card-img-top" alt="Issue">
+                    <div class="card-body">
+                        <span class="badge bg-soft-primary text-primary mb-2 text-capitalize">${
+                          issue.category
+                        }</span>
+                        <p class="card-text fw-bold mb-1">${
+                          issue.description
+                        }</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">📍 ${
+                              issue.location
+                            }</small>
+                            <span class="badge rounded-pill bg-light text-dark border">${
+                              issue.status || "Received"
+                            }</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `
+      )
+      .join("");
+  } catch (err) {
+    console.error("Fetch failed:", err);
+  }
 }
 
-// --- SUBMIT REPORT ---
+// --- SUBMIT ---
 document.getElementById("reportForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const cognitoUser = userPool.getCurrentUser();
 
-  if (!cognitoUser) return alert("Please login first");
-
   cognitoUser.getSession(async (err, session) => {
-    if (err) return alert("Session expired. Please login again.");
+    if (err) return authModal.show();
 
     const token = session.getIdToken().getJwtToken();
     const formData = new FormData(e.target);
@@ -125,81 +192,26 @@ document.getElementById("reportForm").addEventListener("submit", async (e) => {
       });
 
       if (res.ok) {
-        alert("Reported successfully!");
+        alert("Thank you! Report submitted.");
         e.target.reset();
+        document.getElementById("reportCard").classList.add("hidden");
         loadIssues();
-      } else {
-        alert("Server error. Please try again.");
       }
     } catch (err) {
-      alert("Error connecting to backend.");
+      alert("Connection error.");
     }
   });
 });
 
-// --- LOAD ISSUES ---
-async function loadIssues() {
-  try {
-    const res = await fetch(`${backendUrl}/api/issues`);
-    let issues = await res.json();
-
-    const filterValue = document.getElementById("categoryFilter").value;
-
-    if (filterValue) {
-      issues = issues.filter(
-        (issue) => issue.category.toLowerCase() === filterValue.toLowerCase()
-      );
-    }
-
-    const container = document.getElementById("issues");
-
-    if (issues.length === 0) {
-      container.innerHTML =
-        "<div class='col-12 text-center'><p class='text-muted'>No issues found for this category.</p></div>";
-      return;
-    }
-
-    container.innerHTML = issues
-      .map(
-        (issue) => `
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 card-shadow">
-                    <img src="${issue.imageUrl}" class="card-img-top">
-                    <div class="card-body">
-                        <span class="badge bg-info text-dark mb-2 text-capitalize">${
-                          issue.category
-                        }</span>
-                        <p class="card-text">${issue.description}</p>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">📍 ${
-                              issue.location
-                            }</small>
-                            <span class="badge bg-light text-dark border">${
-                              issue.status || "Pending"
-                            }</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `
-      )
-      .join("");
-  } catch (err) {
-    console.error("Load failed", err);
-  }
-}
-
-// 3. Add an Event Listener so it updates instantly when you click the dropdown
-document
-  .getElementById("categoryFilter")
-  .addEventListener("change", loadIssues);
-
 function logout() {
-  const cognitoUser = userPool.getCurrentUser();
-  if (cognitoUser) cognitoUser.signOut();
+  const user = userPool.getCurrentUser();
+  if (user) user.signOut();
   window.location.reload();
 }
 
-// Init
+// Event Listeners & Init
+document
+  .getElementById("categoryFilter")
+  .addEventListener("change", loadIssues);
 checkAuth();
 loadIssues();
