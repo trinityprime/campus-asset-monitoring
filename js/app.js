@@ -16,7 +16,6 @@ document.addEventListener("DOMContentLoaded", () => {
   bsToast = new bootstrap.Toast(toastElement);
 });
 
-// Helper function to replace alert()
 function showToast(message, type = "success") {
   const toastBody = document.getElementById("toastBody");
   toastElement.classList.remove("bg-success", "bg-danger", "bg-warning");
@@ -134,25 +133,29 @@ function login() {
 }
 
 function checkAuth() {
-  const cognitoUser = userPool.getCurrentUser();
-  const logoutBtn = document.getElementById("logoutBtn");
-  const userWelcome = document.getElementById("userWelcome");
+  return new Promise((resolve) => {
+    const cognitoUser = userPool.getCurrentUser();
+    const logoutBtn = document.getElementById("logoutBtn");
+    const userWelcome = document.getElementById("userWelcome");
 
-  if (cognitoUser) {
-    cognitoUser.getSession((err, session) => {
-      if (session && session.isValid()) {
-        if (logoutBtn) logoutBtn.classList.remove("hidden");
-        if (userWelcome) {
-          userWelcome.textContent = `Welcome, ${cognitoUser.getUsername()}`;
-          userWelcome.classList.remove("hidden");
+    if (cognitoUser) {
+      cognitoUser.getSession((err, session) => {
+        if (session && session.isValid()) {
+          if (logoutBtn) logoutBtn.classList.remove("hidden");
+          if (userWelcome) {
+            userWelcome.textContent = `Welcome, ${cognitoUser.getUsername()}`;
+            userWelcome.classList.remove("hidden");
+          }
+        } else {
+          showLoggedOutState();
         }
-      } else {
-        showLoggedOutState();
-      }
-    });
-  } else {
-    showLoggedOutState();
-  }
+        resolve();
+      });
+    } else {
+      showLoggedOutState();
+      resolve();
+    }
+  });
 }
 
 function showLoggedOutState() {
@@ -220,17 +223,19 @@ async function loadIssues() {
     const container = document.getElementById("issues");
     if (issues.length === 0) {
       container.innerHTML =
-        "<p class='text-center mt-5 text-muted'>No issues reported in this category.</p>";
+        "<p class='text-center mt-5 text-muted'>No issues reported.</p>";
       return;
     }
 
     container.innerHTML = issues
       .map((issue) => {
         const currentStatus = issue.status || "New";
-        let badgeClass = "bg-light text-dark";
-        if (currentStatus === "In Progress")
-          badgeClass = "bg-warning text-dark";
-        if (currentStatus === "Resolved") badgeClass = "bg-success text-white";
+        let badgeClass =
+          currentStatus === "In Progress"
+            ? "bg-warning text-dark"
+            : currentStatus === "Resolved"
+            ? "bg-success text-white"
+            : "bg-light text-dark";
 
         const datePosted = issue.reportedAt
           ? new Date(issue.reportedAt).toLocaleDateString("en-GB", {
@@ -240,10 +245,13 @@ async function loadIssues() {
             })
           : "Recently";
 
+        const imageUrlWithCacheBust = `${
+          issue.imageUrl
+        }?t=${new Date().getTime()}`;
+
         const adminControls = `<div class="admin-panel ${
           isAdmin ? "" : "hidden"
         } mt-3 pt-3 border-top">
-          <label class="small fw-bold text-muted d-block mb-1">Admin Status Update:</label>
           <select class="form-select form-select-sm" onchange="updateStatus('${
             issue.issueId
           }', this.value)">
@@ -262,7 +270,7 @@ async function loadIssues() {
         return `<div class="col-md-4 mb-4">
           <div class="card h-100 card-shadow border-0">
               <div class="img-container">
-                  <img src="${issue.imageUrl}" class="card-img-top" alt="Issue" onload="this.style.opacity='1'" style="opacity:0; transition: opacity 0.3s ease;">
+                  <img src="${imageUrlWithCacheBust}" class="card-img-top" alt="Issue" onload="this.style.opacity='1'" style="opacity:0; transition: opacity 0.3s ease;">
               </div>
               <div class="card-body">
                   <div class="d-flex justify-content-between align-items-start mb-2">
@@ -319,6 +327,11 @@ function logout() {
   if (user) user.signOut();
   showToast("Logged out successfully");
   setTimeout(() => window.location.reload(), 1000);
+}
+
+async function init() {
+  await checkAuth();
+  await loadIssues();
 }
 
 document
