@@ -1,4 +1,3 @@
-// --- CONFIGURATION ---
 const poolData = {
   UserPoolId: "us-east-1_9jBRbvy4K",
   ClientId: "2ln0cuq94e7ckjo0ira0qqod5u",
@@ -6,22 +5,33 @@ const poolData = {
 const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 const backendUrl = "http://campus-issues.duckdns.org:3000";
 
-// Global variable for the Bootstrap Modal
 let authModal;
 
-// Initialize Modal when page loads
 document.addEventListener("DOMContentLoaded", () => {
   authModal = new bootstrap.Modal(document.getElementById("authModal"));
 });
 
-// --- AUTH UI LOGIC ---
+function checkUserIsAdmin() {
+  const user = userPool.getCurrentUser();
+  if (!user) return false;
 
-// The "Smart" Button logic
+  const storageKey = `CognitoIdentityServiceProvider.${poolData.ClientId}.${user.username}.idToken`;
+  const idToken = localStorage.getItem(storageKey);
+  if (!idToken) return false;
+
+  try {
+    const payload = JSON.parse(atob(idToken.split(".")[1]));
+    const groups = payload["cognito:groups"] || [];
+    return groups.includes("Admin");
+  } catch (e) {
+    return false;
+  }
+}
+
 function handleReportClick() {
   const cognitoUser = userPool.getCurrentUser();
 
   if (cognitoUser) {
-    // If logged in, ensure we have a valid session, then show form
     cognitoUser.getSession((err, session) => {
       if (err || !session.isValid()) {
         authModal.show();
@@ -32,12 +42,10 @@ function handleReportClick() {
       }
     });
   } else {
-    // Not logged in? Show the popup
     authModal.show();
   }
 }
 
-// --- REGISTER & VERIFY ---
 function register() {
   const username = document.getElementById("regUsername").value;
   const email = document.getElementById("regEmail").value;
@@ -71,11 +79,10 @@ function confirmRegistration() {
   cognitoUser.confirmRegistration(code, true, (err, result) => {
     if (err) return alert(err.message);
     alert("Verified! You can now sign in.");
-    toggleAuth(false); // Switch back to login view inside modal
+    toggleAuth(false);
   });
 }
 
-// --- LOGIN ---
 function login() {
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
@@ -92,40 +99,83 @@ function login() {
 
   cognitoUser.authenticateUser(authDetails, {
     onSuccess: (result) => {
-      authModal.hide(); // Close the popup
-      checkAuth(); // Refresh UI to show logout btn
-      // Automatically open the report form after successful login
+      authModal.hide();
+      checkAuth();
       document.getElementById("reportCard").classList.remove("hidden");
     },
     onFailure: (err) => alert(err.message),
   });
 }
 
-// --- SESSION CHECK ---
 function checkAuth() {
   const cognitoUser = userPool.getCurrentUser();
   const logoutBtn = document.getElementById("logoutBtn");
+  const userWelcome = document.getElementById("userWelcome");
 
   if (cognitoUser) {
     cognitoUser.getSession((err, session) => {
       if (session && session.isValid()) {
         logoutBtn.classList.remove("hidden");
+
+        if (userWelcome) {
+          userWelcome.textContent = `Welcome, ${cognitoUser.getUsername()}`;
+          userWelcome.classList.remove("hidden");
+        }
       } else {
-        logoutBtn.classList.add("hidden");
+        showLoggedOutState();
       }
     });
   } else {
-    logoutBtn.classList.add("hidden");
+    showLoggedOutState();
   }
 }
 
-// --- ISSUES LOGIC (With Filter) ---
+function showLoggedOutState() {
+  document.getElementById("logoutBtn").classList.add("hidden");
+  const userWelcome = document.getElementById("userWelcome");
+  if (userWelcome) userWelcome.classList.add("hidden");
+}
+
+// --- ADMIN: Function to update issue status ---
+async function updateStatus(issueId, newStatus) {
+  const cognitoUser = userPool.getCurrentUser();
+  if (!cognitoUser) return;
+
+  cognitoUser.getSession(async (err, session) => {
+    if (err) return alert("Session expired.");
+
+    const token = session.getIdToken().getJwtToken();
+
+    try {
+      const res = await fetch(`${backendUrl}/api/issues/${issueId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (res.ok) {
+        alert("Status updated!");
+        loadIssues(); // Refresh list
+      } else {
+        alert("Update failed. Admins only.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  });
+}
+
 async function loadIssues() {
   try {
     const res = await fetch(`${backendUrl}/api/issues`);
     let issues = await res.json();
 
+    const isAdmin = checkUserIsAdmin(); // Check once for the whole loop
     const filterValue = document.getElementById("categoryFilter").value;
+
     if (filterValue) {
       issues = issues.filter(
         (i) => i.category.toLowerCase() === filterValue.toLowerCase()
@@ -140,8 +190,30 @@ async function loadIssues() {
     }
 
     container.innerHTML = issues
-      .map(
-        (issue) => `
+      .map((issue) => {
+        // --- ADMIN: Dropdown UI ---
+        const adminControls = isAdmin
+          ? `
+                <div class="mt-3 pt-3 border-top">
+                    <label class="small fw-bold text-muted d-block mb-1">Admin Status Update:</label>
+                    <select class="form-select form-select-sm" onchange="updateStatus('${
+                      issue.issueId
+                    }', this.value)">
+                        <option value="New" ${
+                          issue.status === "New" ? "selected" : ""
+                        }>New</option>
+                        <option value="In Progress" ${
+                          issue.status === "In Progress" ? "selected" : ""
+                        }>In Progress</option>
+                        <option value="Resolved" ${
+                          issue.status === "Resolved" ? "selected" : ""
+                        }>Resolved</option>
+                    </select>
+                </div>
+            `
+          : "";
+
+        return `
             <div class="col-md-4 mb-4">
                 <div class="card h-100 card-shadow border-0">
                     <img src="${
@@ -159,21 +231,21 @@ async function loadIssues() {
                               issue.location
                             }</small>
                             <span class="badge rounded-pill bg-light text-dark border">${
-                              issue.status || "Received"
+                              issue.status || "New"
                             }</span>
                         </div>
+                        ${adminControls}
                     </div>
                 </div>
             </div>
-        `
-      )
+        `;
+      })
       .join("");
   } catch (err) {
     console.error("Fetch failed:", err);
   }
 }
 
-// --- SUBMIT ---
 document.getElementById("reportForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const cognitoUser = userPool.getCurrentUser();
@@ -209,7 +281,6 @@ function logout() {
   window.location.reload();
 }
 
-// Event Listeners & Init
 document
   .getElementById("categoryFilter")
   .addEventListener("change", loadIssues);
