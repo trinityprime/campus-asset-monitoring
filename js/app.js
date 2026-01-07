@@ -102,7 +102,6 @@ function login() {
       authModal.hide();
       checkAuth();
 
-      // CLEANER: Instead of full loadIssues(), just reveal the admin panels
       if (checkUserIsAdmin()) {
         document
           .querySelectorAll(".admin-panel")
@@ -145,7 +144,6 @@ function showLoggedOutState() {
   if (userWelcome) userWelcome.classList.add("hidden");
 }
 
-// --- CLEANER ADMIN: Targeted DOM Update ---
 async function updateStatus(issueId, newStatus) {
   const cognitoUser = userPool.getCurrentUser();
   if (!cognitoUser) return;
@@ -166,11 +164,9 @@ async function updateStatus(issueId, newStatus) {
       });
 
       if (res.ok) {
-        // Targeted Update: Find the specific badge and update it
         const badge = document.getElementById(`badge-${issueId}`);
         if (badge) {
           badge.textContent = newStatus;
-          // Update colors based on status
           badge.className =
             "badge rounded-pill border " +
             (newStatus === "Resolved"
@@ -211,7 +207,23 @@ async function loadIssues() {
 
     container.innerHTML = issues
       .map((issue) => {
-        // Admin controls are rendered but hidden if not logged in as admin
+        const currentStatus = issue.status || "New";
+
+        // Persisting Colors logic
+        let badgeClass = "bg-light text-dark";
+        if (currentStatus === "In Progress")
+          badgeClass = "bg-warning text-dark";
+        if (currentStatus === "Resolved") badgeClass = "bg-success text-white";
+
+        // Date Formatting (Using createdAt from DynamoDB)
+        const datePosted = issue.createdAt
+          ? new Date(issue.createdAt).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
+          : "Recently";
+
         const adminControls = `
                 <div class="admin-panel ${
                   isAdmin ? "" : "hidden"
@@ -221,13 +233,13 @@ async function loadIssues() {
                       issue.issueId
                     }', this.value)">
                         <option value="New" ${
-                          issue.status === "New" ? "selected" : ""
+                          currentStatus === "New" ? "selected" : ""
                         }>New</option>
                         <option value="In Progress" ${
-                          issue.status === "In Progress" ? "selected" : ""
+                          currentStatus === "In Progress" ? "selected" : ""
                         }>In Progress</option>
                         <option value="Resolved" ${
-                          issue.status === "Resolved" ? "selected" : ""
+                          currentStatus === "Resolved" ? "selected" : ""
                         }>Resolved</option>
                     </select>
                 </div>
@@ -236,24 +248,17 @@ async function loadIssues() {
         return `
             <div class="col-md-4 mb-4">
                 <div class="card h-100 card-shadow border-0">
-                    <img src="${
-                      issue.imageUrl
-                    }" class="card-img-top" alt="Issue">
+                    <img src="${issue.imageUrl}" class="card-img-top" alt="Issue">
                     <div class="card-body">
-                        <span class="badge bg-soft-primary text-primary mb-2 text-capitalize">${
-                          issue.category
-                        }</span>
-                        <p class="card-text fw-bold mb-1">${
-                          issue.description
-                        }</p>
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="badge bg-soft-primary text-primary text-capitalize">${issue.category}</span>
+                            <small class="text-muted" style="font-size: 0.75rem;">${datePosted}</small>
+                        </div>
+                        <p class="card-text fw-bold mb-1">${issue.description}</p>
                         <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">📍 ${
-                              issue.location
-                            }</small>
-                            <span id="badge-${
-                              issue.issueId
-                            }" class="badge rounded-pill bg-light text-dark border">
-                                ${issue.status || "New"}
+                            <small class="text-muted">📍 ${issue.location}</small>
+                            <span id="badge-${issue.issueId}" class="badge rounded-pill border ${badgeClass}">
+                                ${currentStatus}
                             </span>
                         </div>
                         ${adminControls}
