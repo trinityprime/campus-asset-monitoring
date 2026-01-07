@@ -246,7 +246,13 @@ async function loadIssues() {
         return `
             <div class="col-md-4 mb-4">
                 <div class="card h-100 card-shadow border-0">
-                    <img src="${issue.imageUrl}" class="card-img-top" alt="Issue">
+                    <div class="img-container">
+                        <img src="${issue.imageUrl}" 
+                            class="card-img-top" 
+                            alt="Issue" 
+                            onload="this.style.opacity='1'" 
+                            style="opacity:0; transition: opacity 0.3s ease;">
+                    </div>
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <span class="badge bg-soft-primary text-primary text-capitalize">${issue.category}</span>
