@@ -159,7 +159,7 @@ async function updateStatus(issueId, newStatus) {
 
       if (res.ok) {
         alert("Status updated!");
-        loadIssues(); // Refresh list
+        loadIssues();
       } else {
         alert("Update failed. Admins only.");
       }
@@ -174,7 +174,7 @@ async function loadIssues() {
     const res = await fetch(`${backendUrl}/api/issues`);
     let issues = await res.json();
 
-    const isAdmin = checkUserIsAdmin(); // Check once for the whole loop
+    const isAdmin = checkUserIsAdmin();
     const filterValue = document.getElementById("categoryFilter").value;
 
     if (filterValue) {
@@ -192,7 +192,6 @@ async function loadIssues() {
 
     container.innerHTML = issues
       .map((issue) => {
-        // --- ADMIN: Dropdown UI ---
         const adminControls = isAdmin
           ? `
                 <div class="mt-3 pt-3 border-top">
