@@ -101,6 +101,7 @@ function login() {
     onSuccess: (result) => {
       authModal.hide();
       checkAuth();
+      loadIssues();
       document.getElementById("reportCard").classList.remove("hidden");
     },
     onFailure: (err) => alert(err.message),
