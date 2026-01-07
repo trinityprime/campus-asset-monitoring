@@ -6,10 +6,28 @@ const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 const backendUrl = "http://campus-issues.duckdns.org:3000";
 
 let authModal;
+let toastElement;
+let bsToast;
 
 document.addEventListener("DOMContentLoaded", () => {
   authModal = new bootstrap.Modal(document.getElementById("authModal"));
+  // Initialize Toast
+  toastElement = document.getElementById("liveToast");
+  bsToast = new bootstrap.Toast(toastElement);
 });
+
+// Helper function to replace alert()
+function showToast(message, type = "success") {
+  const toastBody = document.getElementById("toastBody");
+  toastElement.classList.remove("bg-success", "bg-danger", "bg-warning");
+
+  if (type === "success") toastElement.classList.add("bg-success");
+  if (type === "error") toastElement.classList.add("bg-danger");
+  if (type === "warning") toastElement.classList.add("bg-warning");
+
+  toastBody.textContent = message;
+  bsToast.show();
+}
 
 function checkUserIsAdmin() {
   const user = userPool.getCurrentUser();
@@ -30,7 +48,6 @@ function checkUserIsAdmin() {
 
 function handleReportClick() {
   const cognitoUser = userPool.getCurrentUser();
-
   if (cognitoUser) {
     cognitoUser.getSession((err, session) => {
       if (err || !session.isValid()) {
@@ -59,11 +76,11 @@ function register() {
   ];
 
   userPool.signUp(username, password, attributeList, null, (err, result) => {
-    if (err) return alert(err.message);
+    if (err) return showToast(err.message, "error");
 
     document.getElementById("registerSection").classList.add("hidden");
     document.getElementById("verifySection").classList.remove("hidden");
-    alert("Code sent to " + email);
+    showToast("Verification code sent to " + email);
   });
 }
 
@@ -77,9 +94,11 @@ function confirmRegistration() {
   });
 
   cognitoUser.confirmRegistration(code, true, (err, result) => {
-    if (err) return alert(err.message);
-    alert("Verified! You can now sign in.");
-    toggleAuth(false);
+    if (err) return showToast(err.message, "error");
+    showToast("Verified! You can now sign in.");
+    // Simplified auth toggle
+    document.getElementById("registerSection").classList.remove("hidden");
+    document.getElementById("verifySection").classList.add("hidden");
   });
 }
 
@@ -101,16 +120,16 @@ function login() {
     onSuccess: (result) => {
       authModal.hide();
       checkAuth();
+      showToast("Welcome back, " + username + "!");
 
       if (checkUserIsAdmin()) {
         document
           .querySelectorAll(".admin-panel")
           .forEach((p) => p.classList.remove("hidden"));
       }
-
       document.getElementById("reportCard").classList.remove("hidden");
     },
-    onFailure: (err) => alert(err.message),
+    onFailure: (err) => showToast(err.message, "error"),
   });
 }
 
@@ -122,8 +141,7 @@ function checkAuth() {
   if (cognitoUser) {
     cognitoUser.getSession((err, session) => {
       if (session && session.isValid()) {
-        logoutBtn.classList.remove("hidden");
-
+        if (logoutBtn) logoutBtn.classList.remove("hidden");
         if (userWelcome) {
           userWelcome.textContent = `Welcome, ${cognitoUser.getUsername()}`;
           userWelcome.classList.remove("hidden");
@@ -149,7 +167,7 @@ async function updateStatus(issueId, newStatus) {
   if (!cognitoUser) return;
 
   cognitoUser.getSession(async (err, session) => {
-    if (err) return alert("Session expired.");
+    if (err) return showToast("Session expired.", "error");
 
     const token = session.getIdToken().getJwtToken();
 
@@ -164,6 +182,7 @@ async function updateStatus(issueId, newStatus) {
       });
 
       if (res.ok) {
+        showToast("Status updated to " + newStatus);
         const badge = document.getElementById(`badge-${issueId}`);
         if (badge) {
           badge.textContent = newStatus;
@@ -176,10 +195,11 @@ async function updateStatus(issueId, newStatus) {
               : "bg-light text-dark");
         }
       } else {
-        alert("Update failed. Admins only.");
+        showToast("Update failed. Admins only.", "error");
       }
     } catch (err) {
       console.error(err);
+      showToast("Server error.", "error");
     }
   });
 }
@@ -188,7 +208,6 @@ async function loadIssues() {
   try {
     const res = await fetch(`${backendUrl}/api/issues`);
     let issues = await res.json();
-
     const isAdmin = checkUserIsAdmin();
     const filterValue = document.getElementById("categoryFilter").value;
 
@@ -208,7 +227,6 @@ async function loadIssues() {
     container.innerHTML = issues
       .map((issue) => {
         const currentStatus = issue.status || "New";
-
         let badgeClass = "bg-light text-dark";
         if (currentStatus === "In Progress")
           badgeClass = "bg-warning text-dark";
@@ -222,54 +240,44 @@ async function loadIssues() {
             })
           : "Recently";
 
-        const adminControls = `
-                <div class="admin-panel ${
-                  isAdmin ? "" : "hidden"
-                } mt-3 pt-3 border-top">
-                    <label class="small fw-bold text-muted d-block mb-1">Admin Status Update:</label>
-                    <select class="form-select form-select-sm" onchange="updateStatus('${
-                      issue.issueId
-                    }', this.value)">
-                        <option value="New" ${
-                          currentStatus === "New" ? "selected" : ""
-                        }>New</option>
-                        <option value="In Progress" ${
-                          currentStatus === "In Progress" ? "selected" : ""
-                        }>In Progress</option>
-                        <option value="Resolved" ${
-                          currentStatus === "Resolved" ? "selected" : ""
-                        }>Resolved</option>
-                    </select>
-                </div>
-            `;
+        const adminControls = `<div class="admin-panel ${
+          isAdmin ? "" : "hidden"
+        } mt-3 pt-3 border-top">
+          <label class="small fw-bold text-muted d-block mb-1">Admin Status Update:</label>
+          <select class="form-select form-select-sm" onchange="updateStatus('${
+            issue.issueId
+          }', this.value)">
+              <option value="New" ${
+                currentStatus === "New" ? "selected" : ""
+              }>New</option>
+              <option value="In Progress" ${
+                currentStatus === "In Progress" ? "selected" : ""
+              }>In Progress</option>
+              <option value="Resolved" ${
+                currentStatus === "Resolved" ? "selected" : ""
+              }>Resolved</option>
+          </select>
+      </div>`;
 
-        return `
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 card-shadow border-0">
-                    <div class="img-container">
-                        <img src="${issue.imageUrl}" 
-                            class="card-img-top" 
-                            alt="Issue" 
-                            onload="this.style.opacity='1'" 
-                            style="opacity:0; transition: opacity 0.3s ease;">
-                    </div>
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <span class="badge bg-soft-primary text-primary text-capitalize">${issue.category}</span>
-                            <small class="text-muted" style="font-size: 0.75rem;">${datePosted}</small>
-                        </div>
-                        <p class="card-text fw-bold mb-1">${issue.description}</p>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">📍 ${issue.location}</small>
-                            <span id="badge-${issue.issueId}" class="badge rounded-pill border ${badgeClass}">
-                                ${currentStatus}
-                            </span>
-                        </div>
-                        ${adminControls}
-                    </div>
-                </div>
-            </div>
-        `;
+        return `<div class="col-md-4 mb-4">
+          <div class="card h-100 card-shadow border-0">
+              <div class="img-container">
+                  <img src="${issue.imageUrl}" class="card-img-top" alt="Issue" onload="this.style.opacity='1'" style="opacity:0; transition: opacity 0.3s ease;">
+              </div>
+              <div class="card-body">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                      <span class="badge bg-soft-primary text-primary text-capitalize">${issue.category}</span>
+                      <small class="text-muted" style="font-size: 0.75rem;">${datePosted}</small>
+                  </div>
+                  <p class="card-text fw-bold mb-1">${issue.description}</p>
+                  <div class="d-flex justify-content-between align-items-center">
+                      <small class="text-muted">📍 ${issue.location}</small>
+                      <span id="badge-${issue.issueId}" class="badge rounded-pill border ${badgeClass}">${currentStatus}</span>
+                  </div>
+                  ${adminControls}
+              </div>
+          </div>
+      </div>`;
       })
       .join("");
   } catch (err) {
@@ -295,13 +303,13 @@ document.getElementById("reportForm").addEventListener("submit", async (e) => {
       });
 
       if (res.ok) {
-        alert("Thank you! Report submitted.");
+        showToast("Thank you! Report submitted.");
         e.target.reset();
         document.getElementById("reportCard").classList.add("hidden");
         loadIssues();
       }
     } catch (err) {
-      alert("Connection error.");
+      showToast("Connection error.", "error");
     }
   });
 });
@@ -309,7 +317,8 @@ document.getElementById("reportForm").addEventListener("submit", async (e) => {
 function logout() {
   const user = userPool.getCurrentUser();
   if (user) user.signOut();
-  window.location.reload();
+  showToast("Logged out successfully");
+  setTimeout(() => window.location.reload(), 1000);
 }
 
 document
