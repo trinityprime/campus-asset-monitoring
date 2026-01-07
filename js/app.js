@@ -209,15 +209,13 @@ async function loadIssues() {
       .map((issue) => {
         const currentStatus = issue.status || "New";
 
-        // Persisting Colors logic
         let badgeClass = "bg-light text-dark";
         if (currentStatus === "In Progress")
           badgeClass = "bg-warning text-dark";
         if (currentStatus === "Resolved") badgeClass = "bg-success text-white";
 
-        // Date Formatting (Using createdAt from DynamoDB)
-        const datePosted = issue.createdAt
-          ? new Date(issue.createdAt).toLocaleDateString("en-GB", {
+        const datePosted = issue.reportedAt
+          ? new Date(issue.reportedAt).toLocaleDateString("en-GB", {
               day: "numeric",
               month: "short",
               year: "numeric",
