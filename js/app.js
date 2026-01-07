@@ -101,7 +101,14 @@ function login() {
     onSuccess: (result) => {
       authModal.hide();
       checkAuth();
-      loadIssues();
+
+      // CLEANER: Instead of full loadIssues(), just reveal the admin panels
+      if (checkUserIsAdmin()) {
+        document
+          .querySelectorAll(".admin-panel")
+          .forEach((p) => p.classList.remove("hidden"));
+      }
+
       document.getElementById("reportCard").classList.remove("hidden");
     },
     onFailure: (err) => alert(err.message),
@@ -132,12 +139,13 @@ function checkAuth() {
 }
 
 function showLoggedOutState() {
-  document.getElementById("logoutBtn").classList.add("hidden");
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) logoutBtn.classList.add("hidden");
   const userWelcome = document.getElementById("userWelcome");
   if (userWelcome) userWelcome.classList.add("hidden");
 }
 
-// --- ADMIN: Function to update issue status ---
+// --- CLEANER ADMIN: Targeted DOM Update ---
 async function updateStatus(issueId, newStatus) {
   const cognitoUser = userPool.getCurrentUser();
   if (!cognitoUser) return;
@@ -158,8 +166,19 @@ async function updateStatus(issueId, newStatus) {
       });
 
       if (res.ok) {
-        alert("Status updated!");
-        loadIssues();
+        // Targeted Update: Find the specific badge and update it
+        const badge = document.getElementById(`badge-${issueId}`);
+        if (badge) {
+          badge.textContent = newStatus;
+          // Update colors based on status
+          badge.className =
+            "badge rounded-pill border " +
+            (newStatus === "Resolved"
+              ? "bg-success text-white"
+              : newStatus === "In Progress"
+              ? "bg-warning text-dark"
+              : "bg-light text-dark");
+        }
       } else {
         alert("Update failed. Admins only.");
       }
@@ -192,9 +211,11 @@ async function loadIssues() {
 
     container.innerHTML = issues
       .map((issue) => {
-        const adminControls = isAdmin
-          ? `
-                <div class="mt-3 pt-3 border-top">
+        // Admin controls are rendered but hidden if not logged in as admin
+        const adminControls = `
+                <div class="admin-panel ${
+                  isAdmin ? "" : "hidden"
+                } mt-3 pt-3 border-top">
                     <label class="small fw-bold text-muted d-block mb-1">Admin Status Update:</label>
                     <select class="form-select form-select-sm" onchange="updateStatus('${
                       issue.issueId
@@ -210,8 +231,7 @@ async function loadIssues() {
                         }>Resolved</option>
                     </select>
                 </div>
-            `
-          : "";
+            `;
 
         return `
             <div class="col-md-4 mb-4">
@@ -230,9 +250,11 @@ async function loadIssues() {
                             <small class="text-muted">📍 ${
                               issue.location
                             }</small>
-                            <span class="badge rounded-pill bg-light text-dark border">${
-                              issue.status || "New"
-                            }</span>
+                            <span id="badge-${
+                              issue.issueId
+                            }" class="badge rounded-pill bg-light text-dark border">
+                                ${issue.status || "New"}
+                            </span>
                         </div>
                         ${adminControls}
                     </div>
