@@ -1,19 +1,28 @@
-const poolData = {
-  UserPoolId: import.meta.env.USER_POOL_ID,
-  ClientId: import.meta.env.AWS_CLIENT_ID,
-};
-const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 const backendUrl = "http://campus-issues.duckdns.org:3000";
+
+let poolData = {};
+let userPool;
 
 let authModal;
 let toastElement;
 let bsToast;
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   authModal = new bootstrap.Modal(document.getElementById("authModal"));
-  // Initialize Toast
   toastElement = document.getElementById("liveToast");
   bsToast = new bootstrap.Toast(toastElement);
+
+  try {
+    const res = await fetch(`${backendUrl}/config`);
+    const config = await res.json();
+    poolData = config;
+    userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+    checkAuth();
+    loadIssues();
+  } catch (err) {
+    console.error("Failed to load auth config:", err);
+    showToast("Failed to initialize app. Please refresh.", "error");
+  }
 });
 
 // Helper function to replace alert()
@@ -542,6 +551,3 @@ function clearAILabelFilter() {
   document.getElementById("aiLabelFilter").value = "";
   loadIssues();
 }
-
-checkAuth();
-loadIssues();
