@@ -1,6 +1,6 @@
 const poolData = {
-  UserPoolId: import.meta.env.VITE_AWS_USER_POOL_ID,
-  ClientId: import.meta.env.VITE_AWS_CLIENT_ID,
+  UserPoolId: import.meta.env.USER_POOL_ID,
+  ClientId: import.meta.env.AWS_CLIENT_ID,
 };
 const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 const backendUrl = "http://campus-issues.duckdns.org:3000";
