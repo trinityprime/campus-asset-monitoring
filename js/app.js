@@ -220,17 +220,19 @@ async function loadIssues() {
     const container = document.getElementById("issues");
     if (issues.length === 0) {
       container.innerHTML =
-        "<p class='text-center mt-5 text-muted'>No issues reported in this category.</p>";
+        "<p class='text-center mt-5 text-muted'>No issues reported.</p>";
       return;
     }
 
     container.innerHTML = issues
       .map((issue) => {
         const currentStatus = issue.status || "New";
-        let badgeClass = "bg-light text-dark";
-        if (currentStatus === "In Progress")
-          badgeClass = "bg-warning text-dark";
-        if (currentStatus === "Resolved") badgeClass = "bg-success text-white";
+        let badgeClass =
+          currentStatus === "In Progress"
+            ? "bg-warning text-dark"
+            : currentStatus === "Resolved"
+            ? "bg-success text-white"
+            : "bg-light text-dark";
 
         const datePosted = issue.reportedAt
           ? new Date(issue.reportedAt).toLocaleDateString("en-GB", {
@@ -239,6 +241,30 @@ async function loadIssues() {
               year: "numeric",
             })
           : "Recently";
+
+        // --- NEW: Process AI Data ---
+        // Show top 3 AI Labels as hashtags
+        const labelHTML =
+          issue.aiLabels && issue.aiLabels.length > 0
+            ? issue.aiLabels
+                .slice(0, 3)
+                .map(
+                  (l) =>
+                    `<span class="badge rounded-pill bg-light text-secondary border me-1" style="font-size: 0.6rem;">#${l}</span>`
+                )
+                .join("")
+            : "";
+
+        // Show Detected Text only if it's relevant (e.g., Room numbers/Signs)
+        const textHTML =
+          issue.detectedText && issue.detectedText.length > 0
+            ? `<div class="mt-2 p-2 bg-light rounded border-start border-primary border-3" style="font-size: 0.75rem;">
+             <strong class="text-primary">AI Detected Text:</strong> 
+             <span class="text-dark">${issue.detectedText
+               .slice(0, 2)
+               .join(", ")}</span>
+           </div>`
+            : "";
 
         const adminControls = `<div class="admin-panel ${
           isAdmin ? "" : "hidden"
@@ -259,7 +285,8 @@ async function loadIssues() {
           </select>
       </div>`;
 
-        return `<div class="col-md-4 mb-4">
+        return `
+        <div class="col-md-4 mb-4">
           <div class="card h-100 card-shadow border-0">
               <div class="img-container">
                   <img src="${issue.imageUrl}" class="card-img-top" alt="Issue" onload="this.style.opacity='1'" style="opacity:0; transition: opacity 0.3s ease;">
@@ -269,15 +296,21 @@ async function loadIssues() {
                       <span class="badge bg-soft-primary text-primary text-capitalize">${issue.category}</span>
                       <small class="text-muted" style="font-size: 0.75rem;">${datePosted}</small>
                   </div>
+                  
                   <p class="card-text fw-bold mb-1">${issue.description}</p>
+                  
+                  <div class="mb-2">
+                    ${labelHTML} </div>
+
                   <div class="d-flex justify-content-between align-items-center">
                       <small class="text-muted">📍 ${issue.location}</small>
                       <span id="badge-${issue.issueId}" class="badge rounded-pill border ${badgeClass}">${currentStatus}</span>
                   </div>
-                  ${adminControls}
+
+                  ${textHTML} ${adminControls}
               </div>
           </div>
-      </div>`;
+        </div>`;
       })
       .join("");
   } catch (err) {
