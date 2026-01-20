@@ -204,6 +204,24 @@ async function updateStatus(issueId, newStatus) {
   });
 }
 
+document
+  .getElementById("issueImage")
+  .addEventListener("change", function (event) {
+    const file = event.target.files[0];
+    const preview = document.getElementById("imagePreview");
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        preview.src = e.target.result;
+        preview.style.display = "block";
+      };
+      reader.readAsDataURL(file);
+    } else {
+      preview.style.display = "none";
+    }
+  });
+
 // --- AI Auto-Fill Logic ---
 document.getElementById("analyzeBtn").addEventListener("click", async () => {
   const fileInput = document.getElementById("issueImage");
@@ -238,7 +256,27 @@ document.getElementById("analyzeBtn").addEventListener("click", async () => {
 
     const data = await res.json();
 
-    // 1. Map Labels to Categories
+    const labels = data.labels.slice(0, 3).map((l) => l.toLowerCase());
+    let description = "";
+
+    if (labels.length >= 2) {
+      const lastLabel = labels.pop();
+      description = `The reported issue involves ${labels.join(
+        ", "
+      )} and ${lastLabel}. `;
+    } else if (labels.length === 1) {
+      description = `This issue is related to ${labels[0]}. `;
+    } else {
+      description = `New campus issue reported. `;
+    }
+
+    if (data.text && data.text.length > 0) {
+      const visibleText = data.text.slice(0, 2).join(" / ");
+      description += `Visible text in the image includes: "${visibleText}".`;
+    }
+
+    document.querySelector('textarea[name="description"]').value = description;
+
     const categoryMap = {
       Furniture: ["Chair", "Table", "Desk", "Couch", "Furniture", "Seat"],
       Electrical: ["Light", "Bulb", "Wire", "Socket", "Electricity", "Power"],
@@ -268,22 +306,15 @@ document.getElementById("analyzeBtn").addEventListener("click", async () => {
       if (suggestedCat !== "Infrastructure") break;
     }
 
-    // 2. Update Form Fields
     document.querySelector('select[name="category"]').value = suggestedCat;
 
     if (data.text.length > 0) {
-      // Look for Room/Blk patterns
       const roomMatch = data.text.find(
         (t) => t.match(/[A-Z]?\d-\d/i) || t.toLowerCase().includes("room")
       );
       if (roomMatch)
         document.querySelector('input[name="location"]').value = roomMatch;
     }
-
-    const topLabels = data.labels.slice(0, 3).join(", ").toLowerCase();
-    document.querySelector(
-      'textarea[name="description"]'
-    ).value = `Issue regarding ${topLabels}.`;
 
     showToast("AI Auto-filled your form!", "success");
   } catch (err) {
