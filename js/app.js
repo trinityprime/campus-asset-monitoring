@@ -204,6 +204,97 @@ async function updateStatus(issueId, newStatus) {
   });
 }
 
+// --- AI Auto-Fill Logic ---
+document.getElementById("analyzeBtn").addEventListener("click", async () => {
+  const fileInput = document.getElementById("issueImage");
+  if (!fileInput.files[0])
+    return showToast("Please select an image first!", "warning");
+
+  const btn = document.getElementById("analyzeBtn");
+  const originalText = btn.innerHTML;
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Analyzing...`;
+  btn.disabled = true;
+
+  const formData = new FormData();
+  formData.append("image", fileInput.files[0]);
+
+  try {
+    const cognitoUser = userPool.getCurrentUser();
+    if (!cognitoUser) return authModal.show();
+
+    // Get session for Authorization
+    const session = await new Promise((res, rej) => {
+      cognitoUser.getSession((err, s) => (err ? rej(err) : res(s)));
+    });
+    const token = session.getIdToken().getJwtToken();
+
+    const res = await fetch(`${backendUrl}/analyze`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    if (!res.ok) throw new Error("Analysis failed");
+
+    const data = await res.json();
+
+    // 1. Map Labels to Categories
+    const categoryMap = {
+      Furniture: ["Chair", "Table", "Desk", "Couch", "Furniture", "Seat"],
+      Electrical: ["Light", "Bulb", "Wire", "Socket", "Electricity", "Power"],
+      Infrastructure: [
+        "Wall",
+        "Floor",
+        "Ceiling",
+        "Door",
+        "Window",
+        "Water",
+        "Leak",
+      ],
+      "IT Equipment": ["Screen", "Monitor", "Computer", "Projector", "Cable"],
+      Sanitation: ["Trash", "Waste", "Garbage", "Liquid", "Stain", "Graffiti"],
+    };
+
+    let suggestedCat = "Infrastructure"; // Fallback
+    for (let label of data.labels) {
+      for (let [cat, keywords] of Object.entries(categoryMap)) {
+        if (
+          keywords.some((k) => label.toLowerCase().includes(k.toLowerCase()))
+        ) {
+          suggestedCat = cat;
+          break;
+        }
+      }
+      if (suggestedCat !== "Infrastructure") break;
+    }
+
+    // 2. Update Form Fields
+    document.querySelector('select[name="category"]').value = suggestedCat;
+
+    if (data.text.length > 0) {
+      // Look for Room/Blk patterns
+      const roomMatch = data.text.find(
+        (t) => t.match(/[A-Z]?\d-\d/i) || t.toLowerCase().includes("room")
+      );
+      if (roomMatch)
+        document.querySelector('input[name="location"]').value = roomMatch;
+    }
+
+    const topLabels = data.labels.slice(0, 3).join(", ").toLowerCase();
+    document.querySelector(
+      'textarea[name="description"]'
+    ).value = `Issue regarding ${topLabels}.`;
+
+    showToast("AI Auto-filled your form!", "success");
+  } catch (err) {
+    console.error(err);
+    showToast("Could not analyze image.", "error");
+  } finally {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+});
+
 async function loadIssues() {
   try {
     const res = await fetch(`${backendUrl}/api/issues`);
@@ -357,5 +448,6 @@ function logout() {
 document
   .getElementById("categoryFilter")
   .addEventListener("change", loadIssues);
+
 checkAuth();
 loadIssues();

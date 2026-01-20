@@ -80,21 +80,30 @@
             <form id="reportForm">
               <div class="row">
                 <div class="col-md-6 mb-3">
-                  <label class="form-label fw-bold">Evidence Photo</label>
+                  <label class="form-label fw-bold">Upload Image</label>
                   <input
                     type="file"
+                    id="issueImage"
                     name="image"
                     class="form-control"
-                    required
+                    accept="image/*"
                   />
+                  <button
+                    type="button"
+                    id="analyzeBtn"
+                    class="btn btn-outline-primary btn-sm mt-2"
+                  >
+                    ✨ Auto-Fill using AI
+                  </button>
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label fw-bold">Category</label>
-                  <select name="category" class="form-select" required>
-                    <option value="furniture">Furniture</option>
-                    <option value="electrical">Electrical</option>
-                    <option value="cleanliness">Cleanliness</option>
-                    <option value="safety">Safety</option>
+                  <select name="category" class="form-select">
+                    <option value="Infrastructure">Infrastructure</option>
+                    <option value="Furniture">Furniture</option>
+                    <option value="Electrical">Electrical</option>
+                    <option value="IT Equipment">IT Equipment</option>
+                    <option value="Sanitation">Sanitation</option>
                   </select>
                 </div>
               </div>
