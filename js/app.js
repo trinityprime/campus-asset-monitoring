@@ -55,6 +55,9 @@ function handleReportClick() {
       } else {
         const reportCard = document.getElementById("reportCard");
         reportCard.classList.remove("hidden");
+        document.getElementById("reportForm").reset();
+        document.getElementById("imagePreview").style.display = "none";
+        document.getElementById("imagePreview").src = "#";
         reportCard.scrollIntoView({ behavior: "smooth" });
       }
     });
@@ -191,8 +194,8 @@ async function updateStatus(issueId, newStatus) {
             (newStatus === "Resolved"
               ? "bg-success text-white"
               : newStatus === "In Progress"
-              ? "bg-warning text-dark"
-              : "bg-light text-dark");
+                ? "bg-warning text-dark"
+                : "bg-light text-dark");
         }
       } else {
         showToast("Update failed. Admins only.", "error");
@@ -262,7 +265,7 @@ document.getElementById("analyzeBtn").addEventListener("click", async () => {
     if (labels.length >= 2) {
       const lastLabel = labels.pop();
       description = `The reported issue involves ${labels.join(
-        ", "
+        ", ",
       )} and ${lastLabel}. `;
     } else if (labels.length === 1) {
       description = `This issue is related to ${labels[0]}. `;
@@ -310,7 +313,7 @@ document.getElementById("analyzeBtn").addEventListener("click", async () => {
 
     if (data.text.length > 0) {
       const roomMatch = data.text.find(
-        (t) => t.match(/[A-Z]?\d-\d/i) || t.toLowerCase().includes("room")
+        (t) => t.match(/[A-Z]?\d-\d/i) || t.toLowerCase().includes("room"),
       );
       if (roomMatch)
         document.querySelector('input[name="location"]').value = roomMatch;
@@ -331,13 +334,25 @@ async function loadIssues() {
     const res = await fetch(`${backendUrl}/api/issues`);
     let issues = await res.json();
     const isAdmin = checkUserIsAdmin();
-    const filterValue = document.getElementById("categoryFilter").value;
+    const categoryFilterValue = document.getElementById("categoryFilter").value;
+    const aiLabelFilterValue = document.getElementById("aiLabelFilter").value;
 
-    if (filterValue) {
+    // Filter by category
+    if (categoryFilterValue) {
       issues = issues.filter(
-        (i) => i.category.toLowerCase() === filterValue.toLowerCase()
+        (i) => i.category.toLowerCase() === categoryFilterValue.toLowerCase(),
       );
     }
+
+    // Filter by AI labels
+    if (aiLabelFilterValue) {
+      issues = issues.filter(
+        (i) => i.aiLabels && i.aiLabels.includes(aiLabelFilterValue),
+      );
+    }
+
+    // Populate AI Label filter dropdown with unique labels from all issues
+    updateAILabelFilter();
 
     const container = document.getElementById("issues");
     if (issues.length === 0) {
@@ -353,8 +368,8 @@ async function loadIssues() {
           currentStatus === "In Progress"
             ? "bg-warning text-dark"
             : currentStatus === "Resolved"
-            ? "bg-success text-white"
-            : "bg-light text-dark";
+              ? "bg-success text-white"
+              : "bg-light text-dark";
 
         const datePosted = issue.reportedAt
           ? new Date(issue.reportedAt).toLocaleDateString("en-GB", {
@@ -372,7 +387,7 @@ async function loadIssues() {
                 .slice(0, 3)
                 .map(
                   (l) =>
-                    `<span class="badge rounded-pill bg-light text-secondary border me-1" style="font-size: 0.6rem;">#${l}</span>`
+                    `<span class="badge rounded-pill bg-light text-secondary border me-1" style="font-size: 0.6rem;">#${l}</span>`,
                 )
                 .join("")
             : "";
@@ -460,6 +475,8 @@ document.getElementById("reportForm").addEventListener("submit", async (e) => {
       if (res.ok) {
         showToast("Thank you! Report submitted.");
         e.target.reset();
+        document.getElementById("imagePreview").style.display = "none";
+        document.getElementById("imagePreview").src = "#";
         document.getElementById("reportCard").classList.add("hidden");
         loadIssues();
       }
@@ -476,9 +493,45 @@ function logout() {
   setTimeout(() => window.location.reload(), 1000);
 }
 
+async function updateAILabelFilter() {
+  try {
+    const res = await fetch(`${backendUrl}/api/issues`);
+    const issues = await res.json();
+
+    const uniqueLabels = new Set();
+    issues.forEach((issue) => {
+      if (issue.aiLabels && Array.isArray(issue.aiLabels)) {
+        issue.aiLabels.forEach((label) => uniqueLabels.add(label));
+      }
+    });
+
+    const sortedLabels = Array.from(uniqueLabels).sort();
+
+    const selectElement = document.getElementById("aiLabelFilter");
+    const currentValue = selectElement.value;
+
+    while (selectElement.options.length > 1) {
+      selectElement.remove(1);
+    }
+
+    sortedLabels.forEach((label) => {
+      const option = document.createElement("option");
+      option.value = label;
+      option.textContent = label;
+      selectElement.appendChild(option);
+    });
+
+    selectElement.value = currentValue;
+  } catch (err) {
+    console.error("Failed to update AI label filter:", err);
+  }
+}
+
 document
   .getElementById("categoryFilter")
   .addEventListener("change", loadIssues);
+
+document.getElementById("aiLabelFilter").addEventListener("change", loadIssues);
 
 checkAuth();
 loadIssues();
