@@ -533,5 +533,15 @@ document
 
 document.getElementById("aiLabelFilter").addEventListener("change", loadIssues);
 
+function clearCategoryFilter() {
+  document.getElementById("categoryFilter").value = "";
+  loadIssues();
+}
+
+function clearAILabelFilter() {
+  document.getElementById("aiLabelFilter").value = "";
+  loadIssues();
+}
+
 checkAuth();
 loadIssues();
