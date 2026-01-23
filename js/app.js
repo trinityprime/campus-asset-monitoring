@@ -1,4 +1,4 @@
-const backendUrl = "http://campus-issues.duckdns.org:3000";
+const backendUrl = "http://campus-lb-742208453.us-east-1.elb.amazonaws.com";
 
 let poolData = {};
 let userPool;
