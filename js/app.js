@@ -1,4 +1,4 @@
-const backendUrl = "/api";
+const backendUrl = "http://campus-issues.duckdns.org:3000";
 
 let poolData = {};
 let userPool;
@@ -184,7 +184,7 @@ async function updateStatus(issueId, newStatus) {
     const token = session.getIdToken().getJwtToken();
 
     try {
-      const res = await fetch(`${backendUrl}/issues/${issueId}/status`, {
+      const res = await fetch(`${backendUrl}/api/issues/${issueId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -340,7 +340,7 @@ document.getElementById("analyzeBtn").addEventListener("click", async () => {
 
 async function loadIssues() {
   try {
-    const res = await fetch(`${backendUrl}/issues`);
+    const res = await fetch(`${backendUrl}/api/issues`);
     let issues = await res.json();
     const isAdmin = checkUserIsAdmin();
     const categoryFilterValue = document.getElementById("categoryFilter").value;
@@ -504,7 +504,7 @@ function logout() {
 
 async function updateAILabelFilter() {
   try {
-    const res = await fetch(`${backendUrl}/issues`);
+    const res = await fetch(`${backendUrl}/api/issues`);
     const issues = await res.json();
 
     const uniqueLabels = new Set();
